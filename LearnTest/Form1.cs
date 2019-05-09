@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using HIX;
+using System.Threading;
 
 namespace LearnTest
 {
@@ -15,16 +16,17 @@ namespace LearnTest
     {
 
         public static MainForm instance = null;
-
+        public SynchronizationContext m_SyncContext = null;
         public MainForm()
         {
             InitializeComponent();
             instance = this;
+            m_SyncContext = SynchronizationContext.Current;
         }
 
         public static MainForm GetInstance()
         {
-            if(instance != null)
+            if (instance != null)
             {
                 return instance;
             }
@@ -45,13 +47,13 @@ namespace LearnTest
 
         private void button2_Click(object sender, EventArgs e)
         {
-            //ChangeUIClass myChangeUIClass = new ChangeUIClass();
+            ChangeUIClass myChangeUIClass = new ChangeUIClass();
             //myChangeUIClass.changeUIEventHandler += new ChangeUIDelegate(ChangeUI);
 
             //myChangeUIClass.ChangeUIFun(MainForm.GetInstance().label1, "改变");
-            TaskRun2.eventHandlerChangeUI += new EventHandler(ChangeUIFun);
-            TaskRun2.Start2();
-            
+            //     TaskRun2.eventHandlerChangeUI += new EventHandler(ChangeUIFun);
+            TaskRun.Start2();
+
         }
 
         public void ChangeUIFun(object sender, EventArgs e)
@@ -64,33 +66,123 @@ namespace LearnTest
         {
             string path = "D:FAI.csv";
             CsvHelper.StringToCsv(this.textBox1.Text, path);
-            
+
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            TaskRun4 myTaskRun4 = new TaskRun4();
+            myTaskRun4.ThreadFun();
+        }
+
+        public void ChangeBtnText(string Text)
+        {
+            Action DoAction = delegate ()
+            {
+                label1.Text = Text;
+            };
+
+            if (this.InvokeRequired)
+            {
+                ControlExtensions.UIThreadInvoke(this, delegate
+                {
+                    DoAction();
+                });
+            }
+            else
+            {
+                DoAction();
+            }
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            Form2 myForm2 = new Form2();
+            myForm2.btnClickEvent += Change;
+            myForm2.Show();
+        }
+
+        public void Change(string msg)
+        {
+            this.label1.Text = "事件改变！" + msg;
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            TaskRun5 myTask = new TaskRun5();
+            myTask.ThreadFun();
+        }
+    }
+
+
+    public static class ControlExtensions
+    {
+        /// <summary>
+        /// 同步执行 注：外层Try Catch语句不能捕获Code委托中的错误
+        /// </summary>
+        static public void UIThreadInvoke(this Control control, Action Code)
+        {
+            try
+            {
+                if (control.InvokeRequired)
+                {
+                    control.Invoke(Code);
+                    return;
+                }
+                Code.Invoke();
+            }
+            catch
+            {
+                /*仅捕获、不处理！*/
+            }
+        }
+    }
+
+    public class TaskRun4
+    {
+        public void ThreadFun()
+        {
+            Task newTask = new Task(() => { MainForm.GetInstance().ChangeBtnText("改变啦"); });
+            newTask.Start();
+        }
+
+        public void myFun()
+        {
+            MainForm.GetInstance().ChangeBtnText("改变啦");
         }
     }
 
 
 
+    public class TaskRun5
+    {
+        public void ThreadFun()
+        {
+            Task newTask = new Task(() => myFun());
+            newTask.Start();
+        }
+
+        public void myFun()
+        {
+            ChangeUIClass myChangeUIClass = new ChangeUIClass();
+            myChangeUIClass.ChangeUI(MainForm.GetInstance().label1, "委托改变！");
+            //myChangeUIClass.SpecificChange(MainForm.GetInstance().label1, "委托改变！");
+        }
+    }
 
 
-
-    public delegate void ChangeUIDelegate(Control uiControl, object obj);
     public class ChangeUIClass
     {
-        public event ChangeUIDelegate changeUIEventHandler;
-
-        public void ChangeUIFun(Control uiControl, object obj)
-        {
-            changeUIEventHandler?.Invoke(uiControl, obj);
-        }
+        public delegate void ChangeUIDelegate(Control uiControl, object obj);
 
         public void ChangeUI(Control myControl, object obj)
         {
-            if(myControl.InvokeRequired)
+            if (myControl.InvokeRequired)
             {
                 ChangeUIDelegate myChangeUIDelegate = new ChangeUIDelegate(ChangeUI);
                 myControl.Invoke(myChangeUIDelegate, new object[] { myControl, obj });
             }
-           else
+            else
             {
                 SpecificChange(myControl, obj);
             }
@@ -105,7 +197,7 @@ namespace LearnTest
 
     public class TaskRun
     {
-        
+
         public static void Start2()
         {
             Task myRun = new Task(() => Start());
@@ -114,10 +206,19 @@ namespace LearnTest
 
         public static void Start()
         {
-            ChangeUIClass myChangeUIClass = new ChangeUIClass();
-            //myChangeUIClass.changeUIEventHandler += new ChangeUIDelegate(myChangeUIClass.ChangeUI);
+            //ChangeUIClass myChangeUIClass = new ChangeUIClass();
+            ////myChangeUIClass.changeUIEventHandler += new ChangeUIDelegate(myChangeUIClass.ChangeUI);
 
-            myChangeUIClass.ChangeUI(MainForm.GetInstance().label1, "改变");
+            //myChangeUIClass.ChangeUI(MainForm.GetInstance().label1, "改变");
+            object a = "hh";
+            object b = "hh";
+            MainForm.GetInstance().m_SyncContext.Post(ChangeText, new object[] { a, b });
+        }
+
+        public static void ChangeText(object text)
+        {
+            object[] a = (object[])text;
+            a[0].ToString();
         }
     }
 
@@ -168,7 +269,7 @@ namespace LearnTest
         void AcceptMsg(string msg);
     }
 
-    public class Subscriber_1: Subscriber
+    public class Subscriber_1 : Subscriber
     {
         public Subscriber_1(Publisher myPublisher)
         {
@@ -187,7 +288,7 @@ namespace LearnTest
         }
     }
 
-    public class Subscriber_2: Subscriber
+    public class Subscriber_2 : Subscriber
     {
         public Subscriber_2(Publisher myPublisher)
         {
